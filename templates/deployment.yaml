@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "pca-http-proxy.fullname" . }}
+  labels:
+    {{- include "pca-http-proxy.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "pca-http-proxy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "pca-http-proxy.selectorLabels" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum | trunc 10}}
+    spec:
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: {{ .Chart.Name }}-init
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          command: ['sh', "/config/init.sh"]
+          volumeMounts:
+            - mountPath: /config
+              name: crio-config
+            - mountPath: /run
+              name: run-volume
+            - mountPath: /host-systemd
+              name: systemd-volume
+            - mountPath: /host-etcd
+              name: etcd-volume
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          command: ['sh', '-c', "sleep infinity"]
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: run-volume
+          hostPath:
+            path: /run
+            type: Directory
+        - name: systemd-volume
+          hostPath:
+            path: /etc/systemd/system/crio.service.d
+            type: DirectoryOrCreate
+        - name: etcd-volume
+          hostPath:
+            path: /etc/crio/crio.conf.d
+            type: DirectoryOrCreate
+        - name: crio-config
+          configMap:
+            name: crio-file
+            items:
+            - key: "systemd-proxy-crio.conf"
+              path: "systemd-proxy-crio.conf"
+            - key: "etc-proxy-crio.conf"
+              path: "etc-proxy-crio.conf"
+            - key: "init.sh"
+              path: "init.sh"

@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: crio-file
+  labels:
+    {{- include "pca-http-proxy.labels" . | nindent 4 }}
+data:
+  systemd-proxy-crio.conf: |
+    [Service]
+    Environment="HTTP_PROXY={{- .Values.proxy.http }}"
+    Environment="HTTPS_PROXY={{- .Values.proxy.https }}"
+    Environment="NO_PROXY={{- .Values.proxy.no_proxy }}"
+  etc-proxy-crio.conf: |
+    [crio]
+    [crio.image]
+      [crio.runtime]
+        default_env = [
+{{- if .Values.proxy.auto_inject_proxy }}
+          "HTTP_PROXY={{- .Values.proxy.http }}",
+          "HTTPS_PROXY={{- .Values.proxy.https }}",
+          "NO_PROXY={{- .Values.proxy.no_proxy }}"
+{{- end}}
+        ]
+  init.sh: |
+    set -ex
+    cp /config/systemd-proxy-crio.conf /host-systemd/ && \
+    cp /config/etc-proxy-crio.conf /host-etcd/ && \
+    SYSTEMCTL_FORCE_BUS=1 systemctl daemon-reload && \
+    SYSTEMCTL_FORCE_BUS=1 systemctl restart crio && \
+    sleep 5

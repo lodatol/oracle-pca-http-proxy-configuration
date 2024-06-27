@@ -1,0 +1,40 @@
+# Default values for pca-http-proxy.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  # set the dns regionregistry of your local pca
+  repository: regionregistry.pca.local/oracle/cloud-provider-oci
+  pullPolicy: IfNotPresent
+  # set the image tag to cloud provider oci image so you are sure that the image is available in the system also before adding the proxy
+  tag: "v1.26.2"
+
+proxy:
+  http: http://proxy.local:8080
+  https: https://proxy.local:8080
+  no_proxy: "*.oraclevcn.com,.*.local,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,169.254.169.254/32"
+  # automatically add proxy environment variable to every container (may seems good to do but it means that you have
+  # to add to no_proxy every single internal endpoint also the endpoint exposed via kube-dns, ... - not suggested we
+  # tried but it was more complex then how it should be, so setting to false)
+  auto_inject_proxy: false
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext:
+  privileged: true
+
+resources: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
